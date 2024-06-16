@@ -1,0 +1,44 @@
+# compiled output
+api-gateway/dist
+stream-processor/dist
+util-generator/dist
+
+# dependencies
+api-gateway/node_modules
+stream-processor/node_modules
+util-generator/node_modules
+
+# environment
+.env
+
+# Logs
+api-gateway/logs
+api-gateway/*.log
+api-gateway/npm-debug.log*
+api-gateway/pnpm-debug.log*
+api-gateway/yarn-debug.log*
+api-gateway/yarn-error.log*
+api-gateway/lerna-debug.log*
+
+# OS
+api-gateway/.DS_Store
+
+# Tests
+api-gateway/coverage
+api-gateway/.nyc_output
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+api-gateway/.vscode/*
+api-gateway/!.vscode/settings.json
+api-gateway/!.vscode/tasks.json
+api-gateway/!.vscode/launch.json
+api-gateway/!.vscode/extensions.json

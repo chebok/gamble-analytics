@@ -1,0 +1,145 @@
+services:
+  api-gateway-1:
+    container_name: api-gateway-gamble-1
+    build:
+      context: ./api-gateway
+    depends_on:
+      - kafka1
+    restart: unless-stopped
+    ports:
+      - ${API_PORT_1}:${API_PORT_1}
+    environment:
+      API_PORT: ${API_PORT_1}
+      KAFKA_HOST: kafka1
+      KAFKA_PORT: ${KAFKA_PORT_1}
+
+  stream-processor-1:
+    container_name: stream-processor-gamble-1
+    build:
+      context: ./stream-processor
+    depends_on:
+      - kafka1
+      - api-gateway-1
+      - clickhouse
+    restart: unless-stopped
+    environment:
+      KAFKA_HOST: kafka1
+      KAFKA_PORT: ${KAFKA_PORT_1}
+      CH_HOST: clickhouse
+      CH_PORT: ${CH_PORT}
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: clickhouse-gamble
+    ports:
+      - "8123:8123" # HTTP interface
+      - "9000:9000" # Native interface
+    restart: unless-stopped
+
+  grafana:
+    build:
+      context: ./grafana
+      dockerfile: Dockerfile.grafana
+    container_name: grafana-gamble
+    depends_on:
+      - clickhouse
+    ports:
+      - ${GRAFANA_PORT}:3000
+    volumes:
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.0.9
+    container_name: zookeeper-gamble
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka1:
+    image: confluentinc/cp-kafka:7.0.9
+    container_name: kafka1-gamble
+    depends_on:
+      - zookeeper
+    healthcheck:
+      test: ["CMD", "/usr/bin/zookeeper-shell", "zookeeper:2181", "get", "/brokers/ids/1"]
+      interval: 3s
+      timeout: 2s
+      retries: 300
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka1:9191,PLAINTEXT_HOST://kafka1:9091
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    ports:
+      - "9191:9191"
+      - "9091:9091"
+
+  kafka2:
+    image: confluentinc/cp-kafka:7.0.9
+    container_name: kafka2-gamble
+    depends_on:
+      - zookeeper
+    healthcheck:
+      test: ["CMD", "/usr/bin/zookeeper-shell", "zookeeper:2181", "get", "/brokers/ids/2"]
+      interval: 3s
+      timeout: 2s
+      retries: 300
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka2:9192,PLAINTEXT_HOST://kafka2:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    ports:
+      - "9192:9192"
+      - "9092:9092"
+
+  kafka3:
+    image: confluentinc/cp-kafka:7.0.9
+    container_name: kafka3-gamble
+    depends_on:
+      - zookeeper
+    healthcheck:
+      test: ["CMD", "/usr/bin/zookeeper-shell", "zookeeper:2181", "get", "/brokers/ids/3"]
+      interval: 3s
+      timeout: 2s
+      retries: 300
+    environment:
+      KAFKA_BROKER_ID: 3
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka3:9193,PLAINTEXT_HOST://kafka3:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    ports:
+      - "9193:9193"
+      - "9093:9093"
+
+  kafdrop:
+    image: obsidiandynamics/kafdrop:4.0.1
+    container_name: kafdrop-gamble
+    restart: "no"
+    ports:
+      - "19000:9000"
+    environment:
+      KAFKA_BROKERCONNECT: "kafka1:9191"
+      JVM_OPTS: "-XX:+UseG1GC -XX:MaxGCPauseMillis=20 -XX:InitiatingHeapOccupancyPercent=35 -Xms512m -Xmx1g"
+    depends_on:
+      - kafka1
