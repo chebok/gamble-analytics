@@ -68,7 +68,7 @@
     </td>
     <td align="center" valign="middle" width="17%">
       <a href="https://clickhouse.com/">
-        <img height="50" alt="Clickhouse" src="https://forgeglobal.com/site/assets/files/7338/1664384702819-clickhouse-logo-500w-1.png"/>
+        <img height="50" alt="Clickhouse" src="https://cdn.worldvectorlogo.com/logos/clickhouse.svg"/>
       </a>
       <br />
       Clickhouse
@@ -80,8 +80,6 @@
       <br />
       Socket.IO
     </td>
-  </tr>
-  <tr>
     <td align="center" valign="middle" width="17%">
       <a href="https://grpc.io/">
         <img height="50" alt="gRPC" src="https://grpc.io/img/logos/grpc-icon-color.png"/>
@@ -96,8 +94,6 @@
       <br />
       Grafana
     </td>
-  </tr>
-  <tr>
     <td align="center" valign="middle" width="17%">
       <a href="https://www.nginx.com/">
         <img height="50" alt="Nginx" src="https://logowik.com/content/uploads/images/nginx7281.logowik.com.webp"/>
