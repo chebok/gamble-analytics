@@ -1,4 +1,4 @@
-import { io } from 'socket.io-client';
+import { Socket, io } from 'socket.io-client';
 import { setInterval } from 'timers';
 
 enum LocationType {
@@ -57,17 +57,17 @@ const generateBet = (): Bet => {
   };
 };
 
-const sendBet = (socket: any) => {
+const sendBet = (socket: Socket) => {
   const bet = generateBet();
   socket.emit('placeBet', bet);
   console.log('Sent bet:', bet);
 };
 
-const numberOfUsers = 1; // Number of simulated users
+const numberOfUsers = 10000; // Number of simulated users
 
 // Create a separate connection for each user
 for (let i = 0; i < numberOfUsers; i++) {
-  const socket = io('http://localhost:3000/betting', {
+  const socket = io('http://localhost/betting', {
     transports: ['websocket'], // Using WebSocket transport for real-time interaction
   });
 

@@ -4,6 +4,7 @@ import {
   OnApplicationShutdown,
   OnModuleInit,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   Admin,
   ITopicConfig,
@@ -18,16 +19,33 @@ export class ProducerService implements OnModuleInit, OnApplicationShutdown {
   private readonly logger = new Logger(ProducerService.name);
   // Моки
   private topicsData: ITopicConfig[] = [
-    { topic: 'bets', numPartitions: 2, replicationFactor: 1 },
+    { topic: 'bets', numPartitions: 2, replicationFactor: 3 },
   ];
 
-  private readonly kafka = new Kafka({
-    brokers: ['kafka1:9091'],
-  });
-  private readonly producer: Producer = this.kafka.producer({
-    createPartitioner: Partitioners.DefaultPartitioner,
-  });
-  private readonly admin: Admin = this.kafka.admin();
+  private kafka: Kafka;
+  private producer: Producer;
+  private admin: Admin;
+
+  constructor(configService: ConfigService) {
+    const host1 = configService.get('KAFKA_HOST_1');
+    const port1 = configService.get('KAFKA_PORT_1');
+
+    const host2 = configService.get('KAFKA_HOST_2');
+    const port2 = configService.get('KAFKA_PORT_2');
+
+    const host3 = configService.get('KAFKA_HOST_3');
+    const port3 = configService.get('KAFKA_PORT_3');
+
+    this.kafka = new Kafka({
+      brokers: [`${host1}:${port1}`, `${host2}:${port2}`, `${host3}:${port3}`],
+    });
+
+    this.producer = this.kafka.producer({
+      createPartitioner: Partitioners.DefaultPartitioner,
+    });
+
+    this.admin = this.kafka.admin();
+  }
 
   async onModuleInit() {
     await this.producer.connect();
