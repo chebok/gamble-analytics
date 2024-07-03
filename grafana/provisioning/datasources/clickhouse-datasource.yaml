@@ -6,8 +6,8 @@ datasources:
     uid: "PDEE91DDB90597936"
     jsonData:
       defaultDatabase: default
-      port: 9000
-      host: clickhouse-gamble
+      port: 8127
+      host: ch-gamble-proxy
       username: default
       tlsSkipVerify: false
       # tlsAuth: <bool>
@@ -15,7 +15,7 @@ datasources:
       # secure: <bool>
       # dialTimeout: <seconds>
       # queryTimeout: <seconds>
-      # protocol: <native|http>
+      protocol: http
       # defaultTable: <string>
       # httpHeaders:
       # - name: X-Example-Header

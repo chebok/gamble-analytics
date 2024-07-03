@@ -1,17 +1,59 @@
 services:
+  nginx:
+    image: nginx:1.21
+    container_name: nginx-gamble
+    restart: on-failure
+    volumes:
+      # Необходимо выставить конфиг вручную, так как нельзя прокинуть переменные окружения из .env
+      - './nginx/default.conf:/etc/nginx/conf.d/default.conf'
+    networks:
+      - gamble_analytics_network
+    ports:
+      - '80:80'
+
   api-gateway-1:
     container_name: api-gateway-gamble-1
     build:
       context: ./api-gateway
     depends_on:
       - kafka1
+      - kafka2
+      - kafka3
     restart: unless-stopped
+    networks:
+      - gamble_analytics_network
     ports:
       - ${API_PORT_1}:${API_PORT_1}
     environment:
       API_PORT: ${API_PORT_1}
-      KAFKA_HOST: kafka1
-      KAFKA_PORT: ${KAFKA_PORT_1}
+      KAFKA_HOST_1: kafka1
+      KAFKA_PORT_1: ${KAFKA_PORT_1}
+      KAFKA_HOST_2: kafka2
+      KAFKA_PORT_2: ${KAFKA_PORT_2}
+      KAFKA_HOST_3: kafka3
+      KAFKA_PORT_3: ${KAFKA_PORT_3}
+  
+  api-gateway-2:
+    container_name: api-gateway-gamble-2
+    build:
+      context: ./api-gateway
+    depends_on:
+      - kafka1
+      - kafka2
+      - kafka3
+    restart: unless-stopped
+    networks:
+      - gamble_analytics_network
+    ports:
+      - ${API_PORT_2}:${API_PORT_2}
+    environment:
+      API_PORT: ${API_PORT_2}
+      KAFKA_HOST_1: kafka1
+      KAFKA_PORT_1: ${KAFKA_PORT_1}
+      KAFKA_HOST_2: kafka2
+      KAFKA_PORT_2: ${KAFKA_PORT_2}
+      KAFKA_HOST_3: kafka3
+      KAFKA_PORT_3: ${KAFKA_PORT_3}
 
   stream-processor-1:
     container_name: stream-processor-gamble-1
@@ -19,22 +61,47 @@ services:
       context: ./stream-processor
     depends_on:
       - kafka1
+      - kafka2
+      - kafka3
       - api-gateway-1
-      - clickhouse
+      - api-gateway-2
+      - ch-gamble-proxy
     restart: unless-stopped
+    networks:
+      - gamble_analytics_network
     environment:
-      KAFKA_HOST: kafka1
-      KAFKA_PORT: ${KAFKA_PORT_1}
-      CH_HOST: clickhouse
+      KAFKA_HOST_1: kafka1
+      KAFKA_PORT_1: ${KAFKA_PORT_1}
+      KAFKA_HOST_2: kafka2
+      KAFKA_PORT_2: ${KAFKA_PORT_2}
+      KAFKA_HOST_3: kafka3
+      KAFKA_PORT_3: ${KAFKA_PORT_3}
+      CH_HOST: ch-gamble-proxy
       CH_PORT: ${CH_PORT}
 
-  clickhouse:
-    image: clickhouse/clickhouse-server:latest
-    container_name: clickhouse-gamble
-    ports:
-      - "8123:8123" # HTTP interface
-      - "9000:9000" # Native interface
+  stream-processor-2:
+    container_name: stream-processor-gamble-2
+    build:
+      context: ./stream-processor
+    depends_on:
+      - kafka1
+      - kafka2
+      - kafka3
+      - api-gateway-1
+      - api-gateway-2
+      - ch-gamble-proxy
     restart: unless-stopped
+    networks:
+      - gamble_analytics_network
+    environment:
+      KAFKA_HOST_1: kafka1
+      KAFKA_PORT_1: ${KAFKA_PORT_1}
+      KAFKA_HOST_2: kafka2
+      KAFKA_PORT_2: ${KAFKA_PORT_2}
+      KAFKA_HOST_3: kafka3
+      KAFKA_PORT_3: ${KAFKA_PORT_3}
+      CH_HOST: ch-gamble-proxy
+      CH_PORT: ${CH_PORT}
 
   grafana:
     build:
@@ -42,7 +109,9 @@ services:
       dockerfile: Dockerfile.grafana
     container_name: grafana-gamble
     depends_on:
-      - clickhouse
+      - ch-gamble-proxy
+    networks:
+      - gamble_analytics_network
     ports:
       - ${GRAFANA_PORT}:3000
     volumes:
@@ -60,6 +129,8 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - gamble_analytics_network
     ports:
       - "2181:2181"
 
@@ -78,10 +149,16 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka1:9191,PLAINTEXT_HOST://kafka1:9091
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # Настройки для автоматического перераспределения лидеров
+      KAFKA_AUTO_LEADER_REBALANCE_ENABLE: "true"
+      KAFKA_LEADER_IMBALANCE_CHECK_INTERVAL_SECONDS: 300
+      KAFKA_LEADER_IMBALANCE_THRESHOLD: 2
+    networks:
+      - gamble_analytics_network
     ports:
       - "9191:9191"
       - "9091:9091"
@@ -101,10 +178,16 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka2:9192,PLAINTEXT_HOST://kafka2:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # Настройки для автоматического перераспределения лидеров
+      KAFKA_AUTO_LEADER_REBALANCE_ENABLE: "true"
+      KAFKA_LEADER_IMBALANCE_CHECK_INTERVAL_SECONDS: 300
+      KAFKA_LEADER_IMBALANCE_THRESHOLD: 2
+    networks:
+      - gamble_analytics_network
     ports:
       - "9192:9192"
       - "9092:9092"
@@ -124,10 +207,16 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka3:9193,PLAINTEXT_HOST://kafka3:9093
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # Настройки для автоматического перераспределения лидеров
+      KAFKA_AUTO_LEADER_REBALANCE_ENABLE: "true"
+      KAFKA_LEADER_IMBALANCE_CHECK_INTERVAL_SECONDS: 300
+      KAFKA_LEADER_IMBALANCE_THRESHOLD: 2
+    networks:
+      - gamble_analytics_network
     ports:
       - "9193:9193"
       - "9093:9093"
@@ -136,6 +225,8 @@ services:
     image: obsidiandynamics/kafdrop:4.0.1
     container_name: kafdrop-gamble
     restart: "no"
+    networks:
+      - gamble_analytics_network
     ports:
       - "19000:9000"
     environment:
@@ -143,3 +234,143 @@ services:
       JVM_OPTS: "-XX:+UseG1GC -XX:MaxGCPauseMillis=20 -XX:InitiatingHeapOccupancyPercent=35 -Xms512m -Xmx1g"
     depends_on:
       - kafka1
+
+  clickhouse-01:
+    image: "clickhouse/clickhouse-server:${CHVER:-latest}"
+    user: "101:101"
+    container_name: clickhouse-01
+    hostname: clickhouse-01
+    networks:
+      cluster_2S_2R_ch_proxy:
+        ipv4_address: 192.168.9.1
+    volumes:
+      - ./ch/volumes/clickhouse-01/etc/clickhouse-server/config.d/config.xml:/etc/clickhouse-server/config.d/config.xml
+      - ./ch/volumes/clickhouse-01/etc/clickhouse-server/users.d/users.xml:/etc/clickhouse-server/users.d/users.xml
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    depends_on:
+      - clickhouse-keeper-01
+      - clickhouse-keeper-02
+      - clickhouse-keeper-03
+  clickhouse-02:
+    image: "clickhouse/clickhouse-server:${CHVER:-latest}"
+    user: "101:101"
+    container_name: clickhouse-02
+    hostname: clickhouse-02
+    networks:
+      cluster_2S_2R_ch_proxy:
+        ipv4_address: 192.168.9.2
+    volumes:
+      - ./ch/volumes/clickhouse-02/etc/clickhouse-server/config.d/config.xml:/etc/clickhouse-server/config.d/config.xml
+      - ./ch/volumes/clickhouse-02/etc/clickhouse-server/users.d/users.xml:/etc/clickhouse-server/users.d/users.xml
+    ports:
+      - "8124:8123"
+      - "9001:9000"
+    depends_on:
+      - clickhouse-keeper-01
+      - clickhouse-keeper-02
+      - clickhouse-keeper-03
+  clickhouse-03:
+    image: "clickhouse/clickhouse-server:${CHVER:-latest}"
+    user: "101:101"
+    container_name: clickhouse-03
+    hostname: clickhouse-03
+    networks:
+      cluster_2S_2R_ch_proxy:
+        ipv4_address: 192.168.9.3
+    volumes:
+      - ./ch/volumes/clickhouse-03/etc/clickhouse-server/config.d/config.xml:/etc/clickhouse-server/config.d/config.xml
+      - ./ch/volumes/clickhouse-03/etc/clickhouse-server/users.d/users.xml:/etc/clickhouse-server/users.d/users.xml
+    ports:
+      - "8125:8123"
+      - "9002:9000"
+    depends_on:
+      - clickhouse-keeper-01
+      - clickhouse-keeper-02
+      - clickhouse-keeper-03
+  clickhouse-04:
+    image: "clickhouse/clickhouse-server:${CHVER:-latest}"
+    user: "101:101"
+    container_name: clickhouse-04
+    hostname: clickhouse-04
+    networks:
+      cluster_2S_2R_ch_proxy:
+        ipv4_address: 192.168.9.4
+    volumes:
+      - ./ch/volumes/clickhouse-04/etc/clickhouse-server/config.d/config.xml:/etc/clickhouse-server/config.d/config.xml
+      - ./ch/volumes/clickhouse-04/etc/clickhouse-server/users.d/users.xml:/etc/clickhouse-server/users.d/users.xml
+    ports:
+        - "8126:8123"
+        - "9003:9000"
+    depends_on:
+      - clickhouse-keeper-01
+      - clickhouse-keeper-02
+      - clickhouse-keeper-03
+  clickhouse-keeper-01:
+    image: "clickhouse/clickhouse-keeper:${CHKVER:-latest-alpine}"
+    user: "101:101"
+    container_name: clickhouse-keeper-01
+    hostname: clickhouse-keeper-01
+    networks:
+      cluster_2S_2R_ch_proxy:
+        ipv4_address: 192.168.9.5
+    volumes:
+      - ./ch/volumes/clickhouse-keeper-01/etc/clickhouse-keeper/keeper_config.xml:/etc/clickhouse-keeper/keeper_config.xml
+    ports:
+        - "9181:9181"
+  clickhouse-keeper-02:
+    image: "clickhouse/clickhouse-keeper:${CHKVER:-latest-alpine}"
+    user: "101:101"
+    container_name: clickhouse-keeper-02
+    hostname: clickhouse-keeper-02
+    networks:
+      cluster_2S_2R_ch_proxy:
+        ipv4_address: 192.168.9.6
+    volumes:
+      - ./ch/volumes/clickhouse-keeper-02/etc/clickhouse-keeper/keeper_config.xml:/etc/clickhouse-keeper/keeper_config.xml
+    ports:
+        - "9182:9181"
+  clickhouse-keeper-03:
+    image: "clickhouse/clickhouse-keeper:${CHKVER:-latest-alpine}"
+    user: "101:101"
+    container_name: clickhouse-keeper-03
+    hostname: clickhouse-keeper-03
+    networks:
+      cluster_2S_2R_ch_proxy:
+        ipv4_address: 192.168.9.7
+    volumes:
+      - ./ch/volumes/clickhouse-keeper-03/etc/clickhouse-keeper/keeper_config.xml:/etc/clickhouse-keeper/keeper_config.xml
+    ports:
+        - "9183:9181"
+  ch-gamble-proxy:
+    image: contentsquareplatform/chproxy:v1.26.4
+    platform: linux/amd64
+    container_name: ch-gamble-proxy
+    hostname: ch-gamble-proxy
+    networks:
+      cluster_2S_2R_ch_proxy:
+        ipv4_address: 192.168.9.10
+      gamble_analytics_network:
+    ports:
+      - ${CH_PORT}:8127
+    environment:
+      CH_PORT: ${CH_PORT}
+    volumes:
+      - ./ch/volumes/ch-proxy/config/config.yml:/opt/config.yml
+    depends_on:
+      - clickhouse-01
+      - clickhouse-02
+      - clickhouse-03
+      - clickhouse-04
+    command: [-config, /opt/config.yml]
+
+networks:
+  gamble_analytics_network:
+    driver: bridge
+  cluster_2S_2R_ch_proxy:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.9.0/24
+          gateway: 192.168.9.254
