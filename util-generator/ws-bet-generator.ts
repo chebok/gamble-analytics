@@ -63,7 +63,7 @@ const sendBet = (socket: Socket) => {
   console.log('Sent bet:', bet);
 };
 
-const numberOfUsers = 10000; // Number of simulated users
+const numberOfUsers = 100; // Number of simulated users
 
 // Create a separate connection for each user
 for (let i = 0; i < numberOfUsers; i++) {

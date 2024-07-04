@@ -90,7 +90,7 @@
           },
           "pluginVersion": "4.0.8",
           "queryType": "table",
-          "rawSql": "SELECT\n    sum(bet_amount) AS total_bet_amount\nFROM bets_local\nWHERE event_time >= now() - INTERVAL 10 SECOND\n",
+          "rawSql": "SELECT\n    sum(bet_amount) AS total_bet_amount\nFROM bets\nWHERE event_time >= now() - INTERVAL 10 SECOND\n",
           "refId": "A"
         }
       ],
